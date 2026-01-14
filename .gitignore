@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+config/credentials.json
+data/*.xlsx
+data/*.xls
+data/*.csv
+
+*.log
+logs/
