@@ -2,9 +2,9 @@
 
 ## Ringkasan
 
-Software CLI berbasis Playwright untuk membantu otomatisasi isian field GC berdasarkan data Excel dan disertai log untuk monitoring. Tersedia GUI berbasis PyQt5 + QFluentWidgets untuk pengguna non-terminal.
+Aplikasi CLI berbasis Playwright untuk membantu otomatisasi isian field GC berdasarkan data Excel, dilengkapi log untuk pemantauan. Tersedia GUI berbasis PyQt5 + QFluentWidgets untuk pengguna non-terminal.
 
-Jika langsung ingin menggunakan versi GUI -> [Build Exe/Installer GUI](#build-exeinstaller-untuk-gui)
+Jika ingin langsung menggunakan versi GUI, lihat [packaging](https://github.com/bpskabbulungan/otomatisasidirgc-6502/tree/main/packaging).
 
 ## Daftar Isi
 
@@ -19,7 +19,6 @@ Jika langsung ingin menggunakan versi GUI -> [Build Exe/Installer GUI](#build-ex
 - [Cara Menjalankan](#cara-menjalankan)
 - [Catatan](#catatan)
 - [Output Log Excel](#output-log-excel)
-- [Build Exe/Installer GUI](#build-exeinstaller-untuk-gui)
 - [Kredit](#kredit)
 
 ## Ringkasan Fitur
@@ -48,7 +47,7 @@ Jika langsung ingin menggunakan versi GUI -> [Build Exe/Installer GUI](#build-ex
 
 ## Prasyarat
 
-- Python 3 sudah terpasang di mesin.
+- Python 3 sudah terpasang.
 - Akun dengan akses ke DIRGC (MatchaPro).
 - File Excel input tersedia di `data/` atau ditentukan lewat `--excel-file`.
 
@@ -70,6 +69,8 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+Catatan: `playwright install chromium` cukup dijalankan sekali per environment.
+
 ## Konfigurasi Akun SSO
 
 Untuk CLI, letakkan file JSON di `config/credentials.json`:
@@ -87,7 +88,7 @@ Atau gunakan environment variables:
 - `DIRGC_PASSWORD`
 
 Pencarian file kredensial juga mendukung fallback `credentials.json` di root project.
-Jika keduanya tersedia, isi file akan diprioritaskan dibanding environment variables.
+Jika file dan environment variables tersedia, isi file akan diprioritaskan.
 Untuk GUI, isi kredensial lewat menu `Akun SSO` (tidak disimpan ke file).
 
 ## File Excel
@@ -132,19 +133,14 @@ python run_dirgc.py
 Opsi CLI penting:
 
 ```bash
-python run_dirgc.py --excel-file data/Direktori_SBR_20260114.xlsx \
-  --credentials-file config/credentials.json \
-  --manual-only \
-  --keep-open \
-  --start 1 \
-  --end 5
+python run_dirgc.py --excel-file data/Direktori_SBR_20260114.xlsx --credentials-file config/credentials.json --manual-only --keep-open --start 1 --end 5
 ```
 
 Gunakan `--start` dan `--end` untuk membatasi baris yang diproses (1-based, inklusif).
 
 Opsi tambahan:
 
-- `--headless` untuk menjalankan browser tanpa UI (SSO sering butuh non-headless).
+- `--headless` untuk menjalankan browser tanpa UI (SSO sering butuh mode non-headless).
 - `--idle-timeout-ms` untuk batas idle (default 300000 / 5 menit).
 - `--web-timeout-s` untuk toleransi loading web (default 30 detik).
 - `--manual-only` untuk selalu login manual (tanpa auto-fill kredensial).
@@ -174,23 +170,6 @@ Kolom log:
 - `catatan`
 
 Nilai `skipped` biasanya muncul jika data sudah GC atau terdeteksi duplikat.
-
-### Build EXE/Installer untuk GUI
-
-1. Build EXE (portable):
-
-```powershell
-.\packaging\build_exe.ps1
-```
-
-2. Build installer (wizard):
-
-- Install Inno Setup.
-- Jalankan compiler:
-
-```powershell
-& "C:\Users\User\AppData\Local\Programs\Inno Setup 6\ISCC.exe" .\packaging\installer.iss
-```
 
 ## Kredit
 
