@@ -112,10 +112,10 @@ def select_matching_card(page, monitor, idsbr, nama_usaha, alamat):
         if idsbr and flags["idsbr"]:
             return True
         if nama_usaha and flags["nama"]:
-            if alamat:
+            if alamat_tokens:
                 return flags["alamat"] or flags["idsbr"]
             return True
-        if not nama_usaha and alamat and flags["alamat"]:
+        if not nama_usaha and alamat_tokens and flags["alamat"]:
             return True
         return False
 
@@ -132,12 +132,8 @@ def select_matching_card(page, monitor, idsbr, nama_usaha, alamat):
                 )
             )
             return candidate["header"], candidate["card"]
-        log_warn(
-            "Single result mismatch; skipping.",
-            idsbr=idsbr_norm or "-",
-            nama_tokens=join_tokens(nama_tokens),
-            alamat_tokens=join_tokens(alamat_tokens),
-        )
+        
+        # Log summary first to provide context for the mismatch
         log_info(
             summarize_match(
                 0,
@@ -145,6 +141,12 @@ def select_matching_card(page, monitor, idsbr, nama_usaha, alamat):
                 candidate["score"],
                 candidate["text"],
             )
+        )
+        log_warn(
+            "Single result mismatch; skipping.",
+            idsbr=idsbr_norm or "-",
+            nama_tokens=join_tokens(nama_tokens),
+            alamat_tokens=join_tokens(alamat_tokens),
         )
         return None
 
