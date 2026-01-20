@@ -1,0 +1,27 @@
+name: No Pull Requests
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  close-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: "Terima kasih atas antusiasme Anda. \n\nSaat ini, repositori ini **tidak menerima Pull Request** dari pihak luar karena alasan pemeliharaan internal. Silakan gunakan fitur **Issues** jika ada masalah.\n\nPR ini akan ditutup secara otomatis.\n\n---\n\nThank you for your interest. We are currently **not accepting Pull Requests** for this repository. Please use **Issues** for bug reports.\n\nThis PR will be automatically closed."
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              state: 'closed'
+            });
