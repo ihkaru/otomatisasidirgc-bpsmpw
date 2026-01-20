@@ -145,7 +145,6 @@ def run_dirgc(
                 "Sec-Ch-Ua": '"Android WebView";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
                 "Sec-Ch-Ua-Mobile": "?1",
                 "Sec-Ch-Ua-Platform": '"Android"',
-                "X-Requested-With": "com.matchapro.app"
             },
             java_script_enabled=True,
             permissions=["geolocation"]
@@ -189,22 +188,37 @@ def run_dirgc(
         )
         install_user_activity_tracking(page, monitor.mark_activity)
 
-        ensure_on_dirgc(
-            page,
-            monitor=monitor,
-            use_saved_credentials=not manual_only,
-            credentials=credentials_value,
-        )
-        process_excel_rows(
-            page,
-            monitor=monitor,
-            excel_file=excel_file,
-            use_saved_credentials=not manual_only,
-            credentials=credentials_value,
-            start_row=start_row,
-            end_row=end_row,
-            progress_callback=progress_callback,
-        )
+        try:
+            ensure_on_dirgc(
+                page,
+                monitor=monitor,
+                use_saved_credentials=not manual_only,
+                credentials=credentials_value,
+            )
+            process_excel_rows(
+                page,
+                monitor=monitor,
+                excel_file=excel_file,
+                use_saved_credentials=not manual_only,
+                credentials=credentials_value,
+                start_row=start_row,
+                end_row=end_row,
+                progress_callback=progress_callback,
+            )
+        except KeyboardInterrupt:
+            if keep_open:
+                if wait_for_close:
+                    wait_for_close()
+                else:
+                    input("Press Enter to close the browser...")
+            raise
+        except RuntimeError as e:
+            if "Run stopped by user" in str(e) and keep_open:
+                 if wait_for_close:
+                    wait_for_close()
+                 else:
+                    input("Press Enter to close the browser...")
+            raise
 
         if keep_open:
             if wait_for_close:

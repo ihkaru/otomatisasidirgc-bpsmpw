@@ -58,10 +58,14 @@ class ActivityMonitor:
         else:
             selector_or_locator.click()
 
-    def bot_fill(self, selector, value):
+    def bot_fill(self, selector_or_locator, value):
         self._check_stop()
         self.mark_activity("bot")
-        self.page.fill(selector, "" if value is None else str(value))
+        val_str = "" if value is None else str(value)
+        if hasattr(selector_or_locator, "fill"):
+            selector_or_locator.fill(val_str)
+        else:
+            self.page.fill(selector_or_locator, val_str)
 
     def bot_select_option(self, selector, **kwargs):
         self._check_stop()
@@ -112,13 +116,20 @@ def ensure_on_dirgc(
     credentials,
 ):
     def is_on_target():
-        return page.url.startswith(TARGET_URL)
+        # Strict check: URL correct AND specific element present indicating app loaded
+        # This prevents "false start" during client-side redirects to login
+        if not page.url.startswith(TARGET_URL):
+            return False
+            
+        # Check for search filter or card list presence
+        # We use a quick check without waiting too long
+        return page.locator("#search-idsbr").count() > 0 or page.locator(".usaha-card").count() > 0
 
     def is_on_login_page():
         return MATCHAPRO_HOST in page.url and LOGIN_PATH in page.url
 
     def is_on_matchapro():
-        return MATCHAPRO_HOST in page.url
+        return page.url.startswith(f"https://{MATCHAPRO_HOST}") or page.url.startswith(f"http://{MATCHAPRO_HOST}")
 
     def is_on_sso_login():
         if SSO_HOST in page.url:
@@ -168,15 +179,111 @@ def ensure_on_dirgc(
             )
             return False
 
-        if not monitor.wait_for_condition(
-            lambda: page.locator("#username").count() > 0, 15
-        ):
-            log_warn("Login fields not found; switching to manual login.")
-            return False
+        # Try robust filling logic
+        # Helper to find input with multiple strategies
+        def find_input_in_context(p, ids, names, placeholders):
+            for i in ids:
+                l = p.locator(f"#{i}")
+                if l.count() > 0 and l.first.is_visible(): return l.first
+            for n in names:
+                l = p.locator(f"input[name='{n}']")
+                if l.count() > 0 and l.first.is_visible(): return l.first
+            for ph in placeholders:
+                l = p.get_by_placeholder(ph)
+                if l.count() > 0 and l.first.is_visible(): return l.first
+            return None
 
-        monitor.bot_fill("#username", username)
-        monitor.bot_fill("#password", password)
-        monitor.bot_click("#kc-login")
+        # Retry finding fields for up to 10 seconds
+        start_find = time.monotonic()
+        user_loc = None
+        pass_loc = None
+        
+        while time.monotonic() - start_find < 10:
+            # Try main page first
+            user_loc = find_input_in_context(page, ["username", "user"], ["username", "user", "email"], ["Username", "Username or email"])
+            pass_loc = find_input_in_context(page, ["password", "pwd"], ["password", "pwd"], ["Password"])
+
+            # If not found, check frames
+            if not user_loc or not pass_loc:
+                 for frame in page.frames:
+                     if not user_loc: user_loc = find_input_in_context(frame, ["username"], ["username"], ["Username"])
+                     if not pass_loc: pass_loc = find_input_in_context(frame, ["password"], ["password"], ["Password"])
+                     if user_loc and pass_loc: break
+            
+            if user_loc and pass_loc:
+                break
+            
+            page.wait_for_timeout(500)
+        
+        if not user_loc or not pass_loc:
+             log_warn("Login fields not found after waiting; switching to manual login.")
+             return False
+
+        # Attempt fill
+        try:
+             # Remove readonly if possible (JS might fail on frames if cross-origin, so wrap in try)
+             try:
+                 user_loc.evaluate("el => el.removeAttribute('readonly')")
+                 pass_loc.evaluate("el => el.removeAttribute('readonly')")
+             except:
+                 pass
+             
+             # Use generic fill to avoid activity tracking issues if needed, but bot_fill handles it
+             monitor.bot_fill(user_loc, username)
+             monitor.bot_fill(pass_loc, password)
+             
+             # Click login
+             login_btn = None
+             # Try to find button in same context as user field if possible? 
+             # Simpler: just search everywhere like before
+             
+             # Search button
+             possible_btns = ["#kc-login", "input[type='submit']", "button[type='submit']"]
+             for sel in possible_btns:
+                 l = page.locator(sel)
+                 if l.count() > 0:
+                     login_btn = l.first
+                     break
+            
+             if login_btn:
+                  monitor.bot_click(login_btn)
+             else:
+                  pass_loc.press("Enter")
+             
+             # Check for immediate login errors or success
+             error_selectors = [
+                 "#input-error",
+                 "#kc-error-message",
+                 ".kc-feedback-text",
+                 ".alert-error",
+                 ".pf-c-alert__title",
+             ]
+             
+             start = time.monotonic()
+             while True:
+                 if is_on_matchapro():
+                     return True
+                 
+                 for selector in error_selectors:
+                     # Check main page
+                     if page.locator(selector).count() > 0 and page.locator(selector).first.is_visible():
+                         log_warn("Login error detected on page.")
+                         return False
+                     # Check frames just in case
+                     for frame in page.frames:
+                         if frame.locator(selector).count() > 0 and frame.locator(selector).first.is_visible():
+                            log_warn("Login error detected in frame.")
+                            return False
+
+                 if time.monotonic() - start > monitor.scale_timeout(5):
+                     # Assume success if no error appeared quickly, let the caller wait for full load
+                     return True
+                 
+                 page.wait_for_timeout(500)
+
+        except Exception as e:
+             log_warn(f"Error during auto-fill: {e}")
+             return False
 
         error_selectors = [
             "#input-error",
@@ -208,6 +315,8 @@ def ensure_on_dirgc(
     monitor.bot_goto(TARGET_URL)
 
     while True:
+        monitor.idle_check()  # Ensure we check for stop requests every cycle
+        
         if is_on_target():
             log_info("On target page.", url=page.url)
             return
@@ -256,11 +365,21 @@ def is_visible(page, selector):
 
 
 def wait_for_block_ui_clear(page, monitor, timeout_s=15):
-    monitor.wait_for_condition(
-        lambda: page.locator(BLOCK_UI_SELECTOR).count() == 0
-        or not is_visible(page, BLOCK_UI_SELECTOR),
-        timeout_s=timeout_s,
-    )
+    try:
+        monitor.wait_for_condition(
+            lambda: page.locator(BLOCK_UI_SELECTOR).count() == 0
+            or not is_visible(page, BLOCK_UI_SELECTOR),
+            timeout_s=timeout_s,
+        )
+    except RuntimeError:
+        # If still there after timeout, try to remove it aggressively
+        log_warn("BlockUI stuck; attempting to force remove.")
+        page.evaluate(
+            f"""
+            const el = document.querySelector('{BLOCK_UI_SELECTOR}');
+            if (el) el.remove();
+            """
+        )
 
 
 def ensure_filter_panel_open(page, monitor):
@@ -268,6 +387,7 @@ def ensure_filter_panel_open(page, monitor):
         return
     toggle = page.locator("#toggle-filter")
     if toggle.count() > 0:
+        wait_for_block_ui_clear(page, monitor, timeout_s=5)
         monitor.bot_click(toggle.first)
         monitor.wait_for_condition(
             lambda: is_visible(page, "#search-idsbr"), timeout_s=10
@@ -399,16 +519,61 @@ def apply_filter(page, monitor, idsbr, nama_usaha, alamat):
 def hasil_gc_select(page, monitor, code):
     if code is None:
         return False
-    monitor.wait_for_condition(
-        lambda: page.locator("#tt_hasil_gc").count() > 0, timeout_s=15
-    )
-    select_locator = page.locator("#tt_hasil_gc")
-    value_locator = select_locator.locator(f'option[value="{code}"]')
-    if value_locator.count() > 0:
-        monitor.bot_select_option("#tt_hasil_gc", value=str(code))
-        return True
+    
+    # 1. Wait for element
+    if not monitor.wait_for_condition(
+        lambda: page.locator("#tt_hasil_gc").count() > 0 and page.locator("#tt_hasil_gc").first.is_visible(), 
+        timeout_s=5
+    ):
+        log_warn("Dropdown Hasil GC not found/visible.")
+        return False
+
+    value_str = str(code)
+    # Mapping fix for "Tidak Ditemukan" which is code 0 but value 99 in HTML
+    if value_str == "0":
+        value_str = "99"
+
     label = HASIL_GC_LABELS.get(code)
-    if label:
-        monitor.bot_select_option("#tt_hasil_gc", label=label)
+    
+    # 2. Try Standard Playwright Select with FORCE
+    try:
+        # Pass force=True to bypass visibility checks if element is obscured/hidden
+        monitor.bot_select_option("#tt_hasil_gc", value=value_str, force=True)
         return True
-    return False
+    except Exception as e:
+        # log_warn(f"Standard select failed: {e}")
+        pass # Fallback
+        
+    if label:
+        try:
+            monitor.bot_select_option("#tt_hasil_gc", label=label, force=True)
+            return True
+        except Exception:
+            pass
+
+    # 3. Ninja Mode: JavaScript Injection (Force Value)
+    try:
+        log_warn(f"Force selecting Hasil GC: {value_str} via JS")
+        page.evaluate(
+            """
+            (value) => {
+                const select = document.querySelector("#tt_hasil_gc");
+                if (select) {
+                    select.value = value;
+                    select.dispatchEvent(new Event('change', {bubbles: true}));
+                    select.dispatchEvent(new Event('input', {bubbles: true}));
+                    // Trigger jQuery change if present (common in older admin themes)
+                    if (window.jQuery) {
+                        window.jQuery(select).trigger('change');
+                    }
+                }
+            }
+            """,
+            value_str
+        )
+        # Verify if value stuck
+        current_val = page.locator("#tt_hasil_gc").input_value()
+        return str(current_val) == value_str
+    except Exception as e:
+        log_warn(f"JS Force Select failed: {e}")
+        return False

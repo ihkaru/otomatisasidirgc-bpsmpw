@@ -7,9 +7,10 @@ MATCHAPRO_HOST = "matchapro.web.bps.go.id"
 SSO_HOST = "sso.bps.go.id"
 AUTO_LOGIN_RESULT_TIMEOUT_S = 15
 DEFAULT_IDLE_TIMEOUT_MS = 300000
-DEFAULT_WEB_TIMEOUT_S = 30
+DEFAULT_WEB_TIMEOUT_S = 10
 
 DEFAULT_CREDENTIALS_FILE = os.path.join("config", "credentials.json")
+LAST_RUN_STATE_FILE = os.path.join("config", "last_run_state.json")
 LEGACY_CREDENTIALS_FILE = "credentials.json"
 
 DEFAULT_EXCEL_FILE = os.path.join("data", "Direktori_SBR_20260114.xlsx")
