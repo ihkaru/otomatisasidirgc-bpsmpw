@@ -25,3 +25,4 @@ Tool otomatisasi berbasis CLI dan GUI untuk melakukan input data Ground Check (G
 - [2026-01-19] Inisialisasi project.
 - [2026-01-19] Pembuatan panduan operasional dan strategi recovery data log.
 - [2026-01-20] Menambahkan `CONTRIBUTING.md` dan workflow GitHub Action untuk menolak Pull Request secara otomatis.
+- [2026-01-22] SECURITY FIX: Menghapus `config/credentials.json` dari tracking git (namun file tetap ada di lokal). User wajib mengganti password.
