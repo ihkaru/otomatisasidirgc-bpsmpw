@@ -75,7 +75,16 @@ class ActivityMonitor:
     def bot_goto(self, url):
         self._check_stop()
         self.mark_activity("bot")
-        self.page.goto(url, wait_until="domcontentloaded")
+        max_retries = 3
+        for i in range(max_retries):
+            try:
+                self.page.goto(url, wait_until="domcontentloaded")
+                return
+            except Exception as e:
+                if i == max_retries - 1:
+                    raise e
+                log_warn(f"Navigation failed (attempt {i+1}/{max_retries}): {e}. Retrying...")
+                time.sleep(2)
 
 
 def install_user_activity_tracking(page, mark_activity):
