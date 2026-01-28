@@ -66,10 +66,13 @@ Install dependensi:
 
 ```bash
 pip install -r requirements.txt
-playwright install chromium
+python -m playwright install chromium
 ```
 
-Catatan: `playwright install chromium` cukup dijalankan sekali per environment.
+**Catatan:** 
+- Gunakan `python -m playwright install chromium` agar tidak bergantung pada PATH environment variable
+- Instalasi Chromium cukup dijalankan sekali per environment
+- Jika menggunakan perintah `playwright install chromium` dan mendapat error "command not found", gunakan format `python -m` di atas
 
 ## Konfigurasi Akun SSO
 
