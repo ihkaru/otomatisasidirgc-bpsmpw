@@ -62,10 +62,11 @@ Agar tidak perlu mengetik password setiap kali run, buat file konfigurasi.
    *Note: File ini aman ada di komputer lokal Anda dan di-ignore oleh git.*
 
 ### 2. Install Dependencies
-Pastikan environment siap (jika belum pernah dijalankan):
-```bash
+Pastikan environment siap (jika belum pernah dijalankan, jalankan di powershell):
+```powershell
 pip install -r requirements.txt
 playwright install chromium
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 ```
 
 ---
